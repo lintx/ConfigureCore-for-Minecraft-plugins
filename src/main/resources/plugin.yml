@@ -1,0 +1,3 @@
+name: ConfigureCore
+version: 1.0
+main: org.lintx.plugins.modules.configure.ConfigurePlugin

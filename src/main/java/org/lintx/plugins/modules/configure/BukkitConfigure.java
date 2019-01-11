@@ -1,6 +1,5 @@
 package org.lintx.plugins.modules.configure;
 
-import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -9,34 +8,18 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class Configure {
-    protected FileConfiguration config;
-    protected String filepath;
-    protected JavaPlugin plugin;
+public class BukkitConfigure {
+    private FileConfiguration config;
+    private String filepath;
+    private JavaPlugin plugin;
 
-    @Target(ElementType.FIELD)
-    @Retention(RetentionPolicy.RUNTIME)
-    public @interface yamlConfig{
-        String path() default "";
-    }
-
-    @Target(ElementType.TYPE)
-    @Retention(RetentionPolicy.RUNTIME)
-    public @interface yamlFile{
-        String path() default "config.yml";
-    }
-
-    protected Configure(){ }
+    protected BukkitConfigure(){ }
 
     public void load(JavaPlugin plugin){
         load(plugin,null);
@@ -64,7 +47,7 @@ public class Configure {
             }
         }
         if (ymlPath==null){
-            yamlFile anno = this.getClass().getAnnotation(yamlFile.class);
+            ConfigureAnnotation.yamlFile anno = this.getClass().getAnnotation(ConfigureAnnotation.yamlFile.class);
             if (anno!=null){
                 if (!anno.path().equals("")){
                     ymlPath = anno.path();
@@ -120,13 +103,13 @@ public class Configure {
                 else if (UUID.class.isAssignableFrom(fclz)){
                     value = UUID.fromString((String)value);
                 }
-                else if (Configure.class.isAssignableFrom(fclz)){
+                else if (BukkitConfigure.class.isAssignableFrom(fclz)){
                     if (!(value instanceof ConfigurationSection)){
                         throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
                     }
                     ConfigurationSection section = (ConfigurationSection) value;
 
-                    Configure obj = (Configure) fclz.newInstance();
+                    BukkitConfigure obj = (BukkitConfigure) fclz.newInstance();
                     obj.deserialize(section);
                     value = obj;
                 }
@@ -195,9 +178,9 @@ public class Configure {
                 else if (UUID.class.isAssignableFrom(fclz)){
                     config.set(path,((UUID)field.get(this)).toString());
                 }
-                else if (Configure.class.isAssignableFrom(fclz)){
+                else if (BukkitConfigure.class.isAssignableFrom(fclz)){
                     ConfigurationSection section = config.createSection(path);
-                    ((Configure)field.get(this)).serialize(section);
+                    ((BukkitConfigure)field.get(this)).serialize(section);
                 }
                 else if (Enum.class.isAssignableFrom(fclz)){
                     Enum value = (Enum)field.get(this);
@@ -219,10 +202,10 @@ public class Configure {
     private String pathWithField(Field field){
         String path = null;
         try {
-            if (!field.isAnnotationPresent(yamlConfig.class)){
+            if (!field.isAnnotationPresent(ConfigureAnnotation.yamlConfig.class)){
                 return null;
             }
-            yamlConfig anno = field.getAnnotation(yamlConfig.class);
+            ConfigureAnnotation.yamlConfig anno = field.getAnnotation(ConfigureAnnotation.yamlConfig.class);
             if (anno==null){
                 return null;
             }

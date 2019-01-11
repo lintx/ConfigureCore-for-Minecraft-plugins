@@ -8,8 +8,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
@@ -21,11 +23,13 @@ public class Configure {
     protected String filepath;
     protected JavaPlugin plugin;
 
+    @Target(ElementType.FIELD)
     @Retention(RetentionPolicy.RUNTIME)
     public @interface yamlConfig{
         String path() default "";
     }
 
+    @Target(ElementType.TYPE)
     @Retention(RetentionPolicy.RUNTIME)
     public @interface yamlFile{
         String path() default "config.yml";
@@ -34,26 +38,34 @@ public class Configure {
     protected Configure(){ }
 
     public void load(JavaPlugin plugin){
-        this.plugin = plugin;
-        loadconfigure();
+        load(plugin,null);
     }
 
-    private void loadconfigure(){
-        Class clz = this.getClass();
+    public void load(JavaPlugin plugin,String ymlPath){
+        this.plugin = plugin;
+        loadconfigure(ymlPath);
+    }
+
+    private void loadconfigure(String ymlPath){
         FileConfiguration config = null;
-        yamlFile anno = this.getClass().getAnnotation(yamlFile.class);
-        if (anno!=null){
-            if (!anno.path().equals("")){
-                File file = new File(plugin.getDataFolder(),anno.path());
-                if (!file.exists()) {
-                    plugin.saveResource(anno.path(), false);
+        if (ymlPath==null){
+            yamlFile anno = this.getClass().getAnnotation(yamlFile.class);
+            if (anno!=null){
+                if (!anno.path().equals("")){
+                    ymlPath = anno.path();
                 }
-                config = YamlConfiguration.loadConfiguration(file);
-                filepath = anno.path();
             }
         }
-        this.config = config;
-        deserialize(config);
+        if (ymlPath!=null){
+            File file = new File(plugin.getDataFolder(),ymlPath);
+            if (!file.exists()) {
+                plugin.saveResource(ymlPath, false);
+            }
+            config = YamlConfiguration.loadConfiguration(file);
+            filepath = ymlPath;
+            this.config = config;
+            deserialize(config);
+        }
     }
 
     private void deserialize(ConfigurationSection config){
@@ -100,20 +112,7 @@ public class Configure {
                     value = obj;
                 }
                 else if (List.class.isAssignableFrom(fclz)){
-                    //Type ftype = field.getGenericType();
-//                    if (!(ftype instanceof ParameterizedType)){
-//                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is List, but the GenericType cannot read");
-//                    }
-//                    ParameterizedType fptype = (ParameterizedType) ftype;
-//                    Type[] types = fptype.getActualTypeArguments();
-//                    if (types.length!=1){
-//                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is List, but the GenericType's count not 1");
-//                    }
-                    //Class typeclz = (Class) types[0];
                     value = config.getList(path);
-                    //if (String.class.isAssignableFrom(typeclz)){
-
-                    //}
                 }
                 else if (Enum.class.isAssignableFrom(fclz)){
                     try {
@@ -201,6 +200,9 @@ public class Configure {
     private String pathWithField(Field field){
         String path = null;
         try {
+            if (!field.isAnnotationPresent(yamlConfig.class)){
+                return null;
+            }
             yamlConfig anno = field.getAnnotation(yamlConfig.class);
             if (anno==null){
                 return null;

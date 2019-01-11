@@ -8,6 +8,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -47,7 +48,21 @@ public class Configure {
     }
 
     private void loadconfigure(String ymlPath){
-        FileConfiguration config = null;
+        File file;
+        if (ymlPath!=null){
+            file = new File(plugin.getDataFolder(),ymlPath);
+            if (!file.exists()) {
+                try {
+                    InputStream stream = plugin.getResource(ymlPath);
+                    if (stream==null){
+                        ymlPath = null;
+                    }
+                }
+                catch (Exception e){
+                    ymlPath = null;
+                }
+            }
+        }
         if (ymlPath==null){
             yamlFile anno = this.getClass().getAnnotation(yamlFile.class);
             if (anno!=null){
@@ -57,13 +72,17 @@ public class Configure {
             }
         }
         if (ymlPath!=null){
-            File file = new File(plugin.getDataFolder(),ymlPath);
+            file = new File(plugin.getDataFolder(),ymlPath);
             if (!file.exists()) {
-                plugin.saveResource(ymlPath, false);
+                try {
+                    plugin.saveResource(ymlPath, false);
+                }
+                catch (Exception e){
+                    e.printStackTrace();
+                }
             }
-            config = YamlConfiguration.loadConfiguration(file);
+            this.config = YamlConfiguration.loadConfiguration(file);
             filepath = ymlPath;
-            this.config = config;
             deserialize(config);
         }
     }

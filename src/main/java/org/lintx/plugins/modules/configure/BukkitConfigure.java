@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class BukkitConfigure {
+public class BukkitConfigure extends Configure {
     private FileConfiguration config;
     private String filepath;
     private JavaPlugin plugin;
@@ -22,15 +22,18 @@ public class BukkitConfigure {
     protected BukkitConfigure(){ }
 
     public void load(JavaPlugin plugin){
-        load(plugin,null);
+        load(plugin,this,null);
     }
-
     public void load(JavaPlugin plugin,String ymlPath){
-        this.plugin = plugin;
-        loadconfigure(ymlPath);
+        load(plugin,this,ymlPath);
     }
 
-    private void loadconfigure(String ymlPath){
+    public void load(JavaPlugin plugin,Object object){
+        load(plugin,object,null);
+    }
+
+    public void load(JavaPlugin plugin,Object object,String ymlPath){
+        this.plugin = plugin;
         File file;
         if (ymlPath!=null){
             file = new File(plugin.getDataFolder(),ymlPath);
@@ -47,12 +50,7 @@ public class BukkitConfigure {
             }
         }
         if (ymlPath==null){
-            ConfigureAnnotation.yamlFile anno = this.getClass().getAnnotation(ConfigureAnnotation.yamlFile.class);
-            if (anno!=null){
-                if (!anno.path().equals("")){
-                    ymlPath = anno.path();
-                }
-            }
+            ymlPath = pathWithClass(object.getClass());
         }
         if (ymlPath!=null){
             file = new File(plugin.getDataFolder(),ymlPath);
@@ -66,11 +64,39 @@ public class BukkitConfigure {
             }
             this.config = YamlConfiguration.loadConfiguration(file);
             filepath = ymlPath;
-            deserialize(config);
+            deserialize(config,object);
         }
     }
 
-    private void deserialize(ConfigurationSection config){
+    public void save(){
+        save(plugin,this,config,filepath);
+    }
+
+    public void save(JavaPlugin plugin,Object object){
+        save(plugin,object,null);
+    }
+
+    public void save(JavaPlugin plugin,Object object,String ymlPath){
+        save(plugin,object,new YamlConfiguration(),ymlPath);
+    }
+
+    private void save(JavaPlugin plugin,Object object,FileConfiguration config,String ymlPath){
+        File file;
+        if (ymlPath==null){
+            ymlPath = pathWithClass(object.getClass());
+        }
+        if (ymlPath!=null){
+            file = new File(plugin.getDataFolder(),ymlPath);
+            serialize(config,object);
+            try {
+                config.save(file);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void deserialize(ConfigurationSection config,Object object){
         try {
             if (config==null){
                 throw new RuntimeException("config error");
@@ -80,7 +106,7 @@ public class BukkitConfigure {
             e.printStackTrace();
             return;
         }
-        Class clz = this.getClass();
+        Class clz = object.getClass();
         for (Field field : clz.getDeclaredFields()){
             String path = pathWithField(field);
             if (path==null || path.equals("")){
@@ -103,16 +129,6 @@ public class BukkitConfigure {
                 else if (UUID.class.isAssignableFrom(fclz)){
                     value = UUID.fromString((String)value);
                 }
-                else if (BukkitConfigure.class.isAssignableFrom(fclz)){
-                    if (!(value instanceof ConfigurationSection)){
-                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
-                    }
-                    ConfigurationSection section = (ConfigurationSection) value;
-
-                    BukkitConfigure obj = (BukkitConfigure) fclz.newInstance();
-                    obj.deserialize(section);
-                    value = obj;
-                }
                 else if (List.class.isAssignableFrom(fclz)){
                     value = config.getList(path);
                 }
@@ -125,8 +141,18 @@ public class BukkitConfigure {
                         continue;
                     }
                 }
+                else if (clzHasAnnotation(fclz)){
+                    if (!(value instanceof ConfigurationSection)){
+                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
+                    }
+                    ConfigurationSection section = (ConfigurationSection) value;
+
+                    Object obj = fclz.newInstance();
+                    deserialize(section,obj);
+                    value = obj;
+                }
                 if (value!=null){
-                    field.set(this,value);
+                    field.set(object,value);
                 }
             }
             catch (Exception e){
@@ -135,17 +161,7 @@ public class BukkitConfigure {
         }
     }
 
-    public void save(){
-        serialize(config);
-        File file = new File(plugin.getDataFolder(),filepath);
-        try {
-            config.save(file);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void serialize(ConfigurationSection config){
+    private void serialize(ConfigurationSection config,Object object){
         try {
             if (config==null){
                 throw new RuntimeException("config error");
@@ -155,7 +171,7 @@ public class BukkitConfigure {
             e.printStackTrace();
             return;
         }
-        Class clz = this.getClass();
+        Class clz = object.getClass();
         for (Field field : clz.getDeclaredFields()){
             String path = pathWithField(field);
             if (path==null){
@@ -164,7 +180,7 @@ public class BukkitConfigure {
             try {
                 Class fclz = field.getType();
                 if (Map.class.isAssignableFrom(fclz)){
-                    Map map = (Map) field.get(this);
+                    Map map = (Map) field.get(object);
                     if (map==null) continue;
                     ConfigurationSection section = config.createSection(path);
 
@@ -176,50 +192,26 @@ public class BukkitConfigure {
                     }
                 }
                 else if (UUID.class.isAssignableFrom(fclz)){
-                    config.set(path,((UUID)field.get(this)).toString());
-                }
-                else if (BukkitConfigure.class.isAssignableFrom(fclz)){
-                    ConfigurationSection section = config.createSection(path);
-                    ((BukkitConfigure)field.get(this)).serialize(section);
+                    config.set(path,((UUID)field.get(object)).toString());
                 }
                 else if (Enum.class.isAssignableFrom(fclz)){
-                    Enum value = (Enum)field.get(this);
+                    Enum value = (Enum)field.get(object);
                     if (value==null){
                         continue;
                     }
                     config.set(path,value.name());
                 }
+                else if (clzHasAnnotation(fclz)){
+                    ConfigurationSection section = config.createSection(path);
+                    serialize(section,field.get(object));
+                }
                 else{
-                    config.set(path,field.get(this));
+                    config.set(path,field.get(object));
                 }
             }
             catch (Exception e){
                 e.printStackTrace();
             }
         }
-    }
-
-    private String pathWithField(Field field){
-        String path = null;
-        try {
-            if (!field.isAnnotationPresent(ConfigureAnnotation.yamlConfig.class)){
-                return null;
-            }
-            ConfigureAnnotation.yamlConfig anno = field.getAnnotation(ConfigureAnnotation.yamlConfig.class);
-            if (anno==null){
-                return null;
-            }
-            field.setAccessible(true);
-            if (anno.path().equals("")){
-                path = field.getName();
-            }
-            else {
-                path = anno.path();
-            }
-        }
-        catch (Exception e){
-
-        }
-        return path;
     }
 }

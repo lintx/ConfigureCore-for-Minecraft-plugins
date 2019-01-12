@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class BungeeConfigure {
+public class BungeeConfigure extends Configure {
     private Configuration config;
     private String filepath;
     private Plugin plugin;
@@ -20,15 +20,19 @@ public class BungeeConfigure {
     protected BungeeConfigure(){ }
 
     public void load(Plugin plugin){
-        load(plugin,null);
+        load(plugin,this,null);
     }
 
     public void load(Plugin plugin,String ymlPath){
-        this.plugin = plugin;
-        loadconfigure(ymlPath);
+        load(plugin,this,ymlPath);
     }
 
-    private void loadconfigure(String ymlPath){
+    public void load(Plugin plugin,Object object){
+        load(plugin,object,null);
+    }
+
+    public void load(Plugin plugin,Object object,String ymlPath){
+        this.plugin = plugin;
         File file;
         if (ymlPath!=null){
             file = new File(plugin.getDataFolder(),ymlPath);
@@ -45,12 +49,7 @@ public class BungeeConfigure {
             }
         }
         if (ymlPath==null){
-            ConfigureAnnotation.yamlFile anno = this.getClass().getAnnotation(ConfigureAnnotation.yamlFile.class);
-            if (anno!=null){
-                if (!anno.path().equals("")){
-                    ymlPath = anno.path();
-                }
-            }
+            ymlPath = pathWithClass(object.getClass());
         }
         if (ymlPath!=null){
             file = new File(plugin.getDataFolder(),ymlPath);
@@ -71,7 +70,156 @@ public class BungeeConfigure {
                 e.printStackTrace();
             }
             filepath = ymlPath;
-            deserialize(config);
+            deserialize(config,object);
+        }
+    }
+
+    public void save(){
+        save(plugin,this,filepath,config);
+    }
+
+    public void save(Plugin plugin,Object object){
+        save(plugin,object,null);
+    }
+
+    public void save(Plugin plugin,Object object,String ymlPath){
+        save(plugin,object,ymlPath,new Configuration());
+    }
+
+    private void save(Plugin plugin,Object object,String ymlPath,Configuration config){
+        File file;
+        if (ymlPath==null){
+            ymlPath = pathWithClass(object.getClass());
+        }
+        if (ymlPath!=null){
+            file = new File(plugin.getDataFolder(),ymlPath);
+            serialize(config,object);
+            try {
+                autoCreateFile(file);
+                ConfigurationProvider.getProvider(YamlConfiguration.class).save(config,file);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void deserialize(Configuration config,Object object){
+        try {
+            if (config==null){
+                throw new RuntimeException("config error");
+            }
+        }
+        catch (RuntimeException e){
+            e.printStackTrace();
+            return;
+        }
+        Class clz = object.getClass();
+        for (Field field : clz.getDeclaredFields()){
+            String path = pathWithField(field);
+            if (path==null || path.equals("")){
+                continue;
+            }
+            try {
+                Object value = config.get(path);
+                Class fclz = field.getType();
+                if (Map.class.isAssignableFrom(fclz)){
+                    if (!(value instanceof Configuration)){
+                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
+                    }
+                    Configuration section = (Configuration) value;
+                    Map<String,Object> map = new HashMap<String, Object>();
+                    for (String key: section.getKeys()){
+                        map.put(key,section.get(key));
+                    }
+                    value = map;
+                }
+                else if (UUID.class.isAssignableFrom(fclz)){
+                    value = UUID.fromString((String)value);
+                }
+                else if (List.class.isAssignableFrom(fclz)){
+                    value = config.getList(path);
+                }
+                else if (Enum.class.isAssignableFrom(fclz)){
+                    try {
+                        value = Enum.valueOf((Class<? extends Enum>)fclz,(String) value);
+                    }
+                    catch (Exception e){
+                        e.printStackTrace();
+                        continue;
+                    }
+                }
+                else if (clzHasAnnotation(fclz)){
+                    if (!(value instanceof Configuration)){
+                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
+                    }
+                    Configuration section = (Configuration) value;
+                    Object obj = fclz.newInstance();
+                    deserialize(section,obj);
+                    value = obj;
+                }
+                if (value!=null){
+                    field.set(object,value);
+                }
+            }
+            catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void serialize(Configuration config,Object object){
+        try {
+            if (config==null){
+                throw new RuntimeException("config error");
+            }
+        }
+        catch (RuntimeException e){
+            e.printStackTrace();
+            return;
+        }
+        Class clz = object.getClass();
+        for (Field field : clz.getDeclaredFields()){
+            String path = pathWithField(field);
+            if (path==null){
+                continue;
+            }
+            try {
+                Class fclz = field.getType();
+                if (Map.class.isAssignableFrom(fclz)){
+                    Map map = (Map) field.get(object);
+                    if (map==null) continue;
+                    Configuration section = new Configuration();
+
+                    for (Object key: map.keySet()){
+                        if (!(key instanceof String)){
+                            throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, Map's key must string");
+                        }
+                        section.set((String)key,map.get(key));
+                    }
+                    config.set(path,section);
+                }
+                else if (UUID.class.isAssignableFrom(fclz)){
+                    config.set(path,((UUID)field.get(object)).toString());
+                }
+                else if (Enum.class.isAssignableFrom(fclz)){
+                    Enum value = (Enum)field.get(object);
+                    if (value==null){
+                        continue;
+                    }
+                    config.set(path,value.name());
+                }
+                else if (clzHasAnnotation(fclz)){
+                    Configuration section = new Configuration();
+                    serialize(section,field.get(object));
+                    config.set(path,section);
+                }
+                else{
+                    config.set(path,field.get(object));
+                }
+            }
+            catch (Exception e){
+                e.printStackTrace();
+            }
         }
     }
 
@@ -114,82 +262,6 @@ public class BungeeConfigure {
         }
     }
 
-    private void deserialize(Configuration config){
-        try {
-            if (config==null){
-                throw new RuntimeException("config error");
-            }
-        }
-        catch (RuntimeException e){
-            e.printStackTrace();
-            return;
-        }
-        Class clz = this.getClass();
-        for (Field field : clz.getDeclaredFields()){
-            String path = pathWithField(field);
-            if (path==null || path.equals("")){
-                continue;
-            }
-            try {
-                Object value = config.get(path);
-                Class fclz = field.getType();
-                if (Map.class.isAssignableFrom(fclz)){
-                    if (!(value instanceof Configuration)){
-                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
-                    }
-                    Configuration section = (Configuration) value;
-                    Map<String,Object> map = new HashMap<String, Object>();
-                    for (String key: section.getKeys()){
-                        map.put(key,section.get(key));
-                    }
-                    value = map;
-                }
-                else if (UUID.class.isAssignableFrom(fclz)){
-                    value = UUID.fromString((String)value);
-                }
-                else if (BungeeConfigure.class.isAssignableFrom(fclz)){
-                    if (!(value instanceof Configuration)){
-                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
-                    }
-                    Configuration section = (Configuration) value;
-
-                    BungeeConfigure obj = (BungeeConfigure) fclz.newInstance();
-                    obj.deserialize(section);
-                    value = obj;
-                }
-                else if (List.class.isAssignableFrom(fclz)){
-                    value = config.getList(path);
-                }
-                else if (Enum.class.isAssignableFrom(fclz)){
-                    try {
-                        value = Enum.valueOf((Class<? extends Enum>)fclz,(String) value);
-                    }
-                    catch (Exception e){
-                        e.printStackTrace();
-                        continue;
-                    }
-                }
-                if (value!=null){
-                    field.set(this,value);
-                }
-            }
-            catch (Exception e){
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public void save(){
-        serialize(config);
-        File file = new File(plugin.getDataFolder(),filepath);
-        try {
-            autoCreateFile(file);
-            ConfigurationProvider.getProvider(YamlConfiguration.class).save(config,file);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     private void autoCreateFile(File file){
         if(file.exists()) {
             return;
@@ -207,85 +279,5 @@ public class BungeeConfigure {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private void serialize(Configuration config){
-        try {
-            if (config==null){
-                throw new RuntimeException("config error");
-            }
-        }
-        catch (RuntimeException e){
-            e.printStackTrace();
-            return;
-        }
-        Class clz = this.getClass();
-        for (Field field : clz.getDeclaredFields()){
-            String path = pathWithField(field);
-            if (path==null){
-                continue;
-            }
-            try {
-                Class fclz = field.getType();
-                if (Map.class.isAssignableFrom(fclz)){
-                    Map map = (Map) field.get(this);
-                    if (map==null) continue;
-                    Configuration section = new Configuration();
-
-                    for (Object key: map.keySet()){
-                        if (!(key instanceof String)){
-                            throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, Map's key must string");
-                        }
-                        section.set((String)key,map.get(key));
-                    }
-                    config.set(path,section);
-                }
-                else if (UUID.class.isAssignableFrom(fclz)){
-                    config.set(path,((UUID)field.get(this)).toString());
-                }
-                else if (BungeeConfigure.class.isAssignableFrom(fclz)){
-                    Configuration section = new Configuration();
-                    ((BungeeConfigure)field.get(this)).serialize(section);
-                    config.set(path,section);
-                }
-                else if (Enum.class.isAssignableFrom(fclz)){
-                    Enum value = (Enum)field.get(this);
-                    if (value==null){
-                        continue;
-                    }
-                    config.set(path,value.name());
-                }
-                else{
-                    config.set(path,field.get(this));
-                }
-            }
-            catch (Exception e){
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private String pathWithField(Field field){
-        String path = null;
-        try {
-            if (!field.isAnnotationPresent(ConfigureAnnotation.yamlConfig.class)){
-                return null;
-            }
-            ConfigureAnnotation.yamlConfig anno = field.getAnnotation(ConfigureAnnotation.yamlConfig.class);
-            if (anno==null){
-                return null;
-            }
-            field.setAccessible(true);
-            if (anno.path().equals("")){
-                path = field.getName();
-            }
-            else {
-                path = anno.path();
-            }
-        }
-        catch (Exception e){
-
-        }
-        return path;
     }
 }

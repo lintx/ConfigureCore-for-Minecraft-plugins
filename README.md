@@ -25,3 +25,6 @@ Finally, use `Configure.bukkitLoad(plugin,configobj)` or `Configure.bungeeLoad(p
 [Examples for bukkit](https://github.com/lintx/bukkitapi-configure-example)
 
 [Examples for bungee](https://github.com/lintx/bungeeapi-configure-example)
+
+## Download
+[Spigotmc](https://www.spigotmc.org/resources/configurecore.63967/)

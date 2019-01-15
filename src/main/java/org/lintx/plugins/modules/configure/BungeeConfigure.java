@@ -6,11 +6,11 @@ import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
 
 import java.io.*;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.*;
 
 public class BungeeConfigure extends Configure {
     private Configuration config;
@@ -137,7 +137,38 @@ public class BungeeConfigure extends Configure {
                     value = UUID.fromString((String)value);
                 }
                 else if (List.class.isAssignableFrom(fclz)){
-                    value = config.getList(path);
+                    List list = config.getList(path);
+                    if (list==null || list.size()==0){
+                        continue;
+                    }
+                    Type genericType = field.getGenericType();
+                    if (genericType==null){
+                        continue;
+                    }
+                    if (genericType instanceof ParameterizedType){
+                        List<Object> val = new ArrayList<Object>();
+                        ParameterizedType pt = (ParameterizedType)genericType;
+                        Class<?> genericClz = (Class<?>)pt.getActualTypeArguments()[0];
+
+                        if (clzHasAnnotation(genericClz)){
+                            for (Object o : list) {
+                                Constructor constructor = config.getClass().getDeclaredConstructor(Map.class,Configuration.class);
+                                if (constructor!=null){
+                                    constructor.setAccessible(true);
+                                    Configuration section = (Configuration)constructor.newInstance((Map)o,null);
+                                    Object obj = genericClz.newInstance();
+                                    deserialize(section,obj);
+                                    val.add(obj);
+                                    plugin.getLogger().info("val:" + section.getKeys().toString());
+                                }
+                            }
+                        }
+                        else {
+                            val.addAll(list);
+                        }
+                        field.set(object,val);
+                    }
+                    continue;
                 }
                 else if (Enum.class.isAssignableFrom(fclz)){
                     try {
@@ -150,7 +181,7 @@ public class BungeeConfigure extends Configure {
                 }
                 else if (clzHasAnnotation(fclz)){
                     if (!(value instanceof Configuration)){
-                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
+                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Custom Object, but the config is not Custom Object:" + value.toString());
                     }
                     Configuration section = (Configuration) value;
                     Object obj = fclz.newInstance();
@@ -200,6 +231,32 @@ public class BungeeConfigure extends Configure {
                 }
                 else if (UUID.class.isAssignableFrom(fclz)){
                     config.set(path,((UUID)field.get(object)).toString());
+                }
+                else if (List.class.isAssignableFrom(fclz)){
+                    List list = (List) field.get(object);
+                    if (list==null || list.size()==0){
+                        continue;
+                    }
+                    Type genericType = field.getGenericType();
+                    if (genericType==null){
+                        continue;
+                    }
+                    if (genericType instanceof ParameterizedType){
+                        List<Object> val = new ArrayList<Object>();
+                        ParameterizedType pt = (ParameterizedType)genericType;
+                        Class<?> genericClz = (Class<?>)pt.getActualTypeArguments()[0];
+                        if (clzHasAnnotation(genericClz)){
+                            for (Object o : list) {
+                                Configuration section = new Configuration();
+                                serialize(section,o);
+                                val.add(section);
+                            }
+                        }
+                        else {
+                            val.addAll(list);
+                        }
+                        config.set(path,val);
+                    }
                 }
                 else if (Enum.class.isAssignableFrom(fclz)){
                     Enum value = (Enum)field.get(object);

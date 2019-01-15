@@ -8,11 +8,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.lang.reflect.*;
+import java.util.*;
 
 public class BukkitConfigure extends Configure {
     private FileConfiguration config;
@@ -130,7 +127,49 @@ public class BukkitConfigure extends Configure {
                     value = UUID.fromString((String)value);
                 }
                 else if (List.class.isAssignableFrom(fclz)){
-                    value = config.getList(path);
+                    List list = config.getList(path);
+                    if (list==null || list.size()==0){
+                        continue;
+                    }
+                    Type genericType = field.getGenericType();
+                    if (genericType==null){
+                        continue;
+                    }
+                    if (genericType instanceof ParameterizedType){
+                        List<Object> val = new ArrayList<Object>();
+                        ParameterizedType pt = (ParameterizedType)genericType;
+                        Class<?> genericClz = (Class<?>)pt.getActualTypeArguments()[0];
+
+                        if (clzHasAnnotation(genericClz)){
+                            for (Object o : list) {
+                                plugin.getLogger().info("o.class:"+o.getClass());
+                                plugin.getLogger().info("o.tostring:"+o.toString());
+
+                                for (Object o1 : ((LinkedHashMap) o).entrySet()) {
+                                    Map.Entry<?, ?> entry = (Map.Entry) o1;
+                                    plugin.getLogger().info("o.keys:" + entry.getKey() + ",value:" + entry.getValue());
+                                }
+                                YamlConfiguration section = new YamlConfiguration();
+                                Method method = section.getClass().getDeclaredMethod("convertMapsToSections",Map.class,ConfigurationSection.class);
+                                Method[] methods = section.getClass().getDeclaredMethods();
+                                for (Method m :methods){
+                                    plugin.getLogger().info("method:" + m.getName());
+                                }
+                                if (method!=null){
+                                    method.setAccessible(true);
+                                    method.invoke(section,(Map)o,section);
+                                    Object obj = genericClz.newInstance();
+                                    deserialize(section,obj);
+                                    val.add(obj);
+                                }
+                            }
+                        }
+                        else {
+                            val.addAll(list);
+                        }
+                        field.set(object,val);
+                    }
+                    continue;
                 }
                 else if (Enum.class.isAssignableFrom(fclz)){
                     try {
@@ -143,7 +182,7 @@ public class BukkitConfigure extends Configure {
                 }
                 else if (clzHasAnnotation(fclz)){
                     if (!(value instanceof ConfigurationSection)){
-                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Map, but the config is not map:" + value.toString());
+                        throw new RuntimeException("Class:" + clz + ",Field:" + field.getName() + "'s type is Custom Object, but the config is not Custom Object:" + value.toString());
                     }
                     ConfigurationSection section = (ConfigurationSection) value;
 
@@ -193,6 +232,32 @@ public class BukkitConfigure extends Configure {
                 }
                 else if (UUID.class.isAssignableFrom(fclz)){
                     config.set(path,((UUID)field.get(object)).toString());
+                }
+                else if (List.class.isAssignableFrom(fclz)){
+                    List list = (List) field.get(object);
+                    if (list==null || list.size()==0){
+                        continue;
+                    }
+                    Type genericType = field.getGenericType();
+                    if (genericType==null){
+                        continue;
+                    }
+                    if (genericType instanceof ParameterizedType){
+                        List<Object> val = new ArrayList<Object>();
+                        ParameterizedType pt = (ParameterizedType)genericType;
+                        Class<?> genericClz = (Class<?>)pt.getActualTypeArguments()[0];
+                        if (clzHasAnnotation(genericClz)){
+                            for (Object o : list) {
+                                YamlConfiguration section = new YamlConfiguration();
+                                serialize(section,o);
+                                val.add(section);
+                            }
+                        }
+                        else {
+                            val.addAll(list);
+                        }
+                        config.set(path,val);
+                    }
                 }
                 else if (Enum.class.isAssignableFrom(fclz)){
                     Enum value = (Enum)field.get(object);

@@ -57,6 +57,9 @@ public class BungeeConfigure extends Configure {
                 try {
                     saveResource(ymlPath, false);
                 }
+                catch (IllegalArgumentException e){
+                    plugin.getLogger().warning(e.getMessage());
+                }
                 catch (Exception e){
                     e.printStackTrace();
                 }
@@ -159,7 +162,6 @@ public class BungeeConfigure extends Configure {
                                     Object obj = genericClz.newInstance();
                                     deserialize(section,obj);
                                     val.add(obj);
-                                    plugin.getLogger().info("val:" + section.getKeys().toString());
                                 }
                             }
                         }

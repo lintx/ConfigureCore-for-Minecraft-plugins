@@ -1,5 +1,6 @@
 package org.lintx.plugins.modules.configure;
 
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -54,6 +55,9 @@ public class BukkitConfigure extends Configure {
             if (!file.exists()) {
                 try {
                     plugin.saveResource(ymlPath, false);
+                }
+                catch (IllegalArgumentException e){
+                    plugin.getLogger().warning(e.getMessage());
                 }
                 catch (Exception e){
                     e.printStackTrace();
@@ -142,22 +146,13 @@ public class BukkitConfigure extends Configure {
 
                         if (clzHasAnnotation(genericClz)){
                             for (Object o : list) {
-                                plugin.getLogger().info("o.class:"+o.getClass());
-                                plugin.getLogger().info("o.tostring:"+o.toString());
 
-                                for (Object o1 : ((LinkedHashMap) o).entrySet()) {
-                                    Map.Entry<?, ?> entry = (Map.Entry) o1;
-                                    plugin.getLogger().info("o.keys:" + entry.getKey() + ",value:" + entry.getValue());
-                                }
                                 YamlConfiguration section = new YamlConfiguration();
                                 Method method = section.getClass().getDeclaredMethod("convertMapsToSections",Map.class,ConfigurationSection.class);
-                                Method[] methods = section.getClass().getDeclaredMethods();
-                                for (Method m :methods){
-                                    plugin.getLogger().info("method:" + m.getName());
-                                }
+
                                 if (method!=null){
                                     method.setAccessible(true);
-                                    method.invoke(section,(Map)o,section);
+                                    method.invoke(section, o,section);
                                     Object obj = genericClz.newInstance();
                                     deserialize(section,obj);
                                     val.add(obj);
@@ -193,6 +188,9 @@ public class BukkitConfigure extends Configure {
                 if (value!=null){
                     field.set(object,value);
                 }
+            }
+            catch (RuntimeException e){
+                plugin.getLogger().warning(e.getMessage());
             }
             catch (Exception e){
                 e.printStackTrace();

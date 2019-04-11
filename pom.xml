@@ -6,7 +6,30 @@
 
     <groupId>org.lintx.plugins.modules</groupId>
     <artifactId>Configure</artifactId>
-    <version>1.2.1-SNAPSHOT</version>
+    <version>1.2.2-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>ConfigureCore</name>
+    <description>ConfigureCore: Let your Minecraft plugin load and save the configuration. You no longer need to care about config.yml or any other .yml file. Support for BukkitAPI and BungeeCord.</description>
+    <url>https://github.com/lintx/ConfigureCore-for-Minecraft-plugins</url>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://github.com/lintx/ConfigureCore-for-Minecraft-plugins/blob/master/LICENSE</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <scm>
+        <url>https://github.com/lintx/ConfigureCore-for-Minecraft-plugins</url>
+        <connection>https://github.com/lintx/ConfigureCore-for-Minecraft-plugins.git</connection>
+        <developerConnection>https://github.com/lintx/ConfigureCore-for-Minecraft-plugins</developerConnection>
+    </scm>
+    <developers>
+        <developer>
+            <name>LinTx</name>
+            <email>lintx@lintx.org</email>
+            <url>https://github.com/lintx/</url>
+        </developer>
+    </developers>
 
     <repositories>
         <repository>
@@ -19,11 +42,6 @@
         </repository>
     </repositories>
     <dependencies>
-        <dependency>
-            <groupId>org.bukkit</groupId>
-            <artifactId>bukkit</artifactId>
-            <version>1.13.2-R0.1-SNAPSHOT</version>
-        </dependency>
         <dependency>
             <groupId>org.bukkit</groupId>
             <artifactId>bukkit</artifactId>
@@ -47,4 +65,38 @@
             <classifier>sources</classifier>
         </dependency>
     </dependencies>
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <!-- GPG -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
+                        <executions>
+                            <execution>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>lintx-nexus</id>
+                    <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+                </snapshotRepository>
+                <repository>
+                    <id>lintx-nexus</id>
+                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+                </repository>
+            </distributionManagement>
+        </profile>
+    </profiles>
+
 </project>

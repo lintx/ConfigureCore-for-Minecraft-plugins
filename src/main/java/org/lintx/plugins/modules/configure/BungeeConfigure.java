@@ -61,19 +61,19 @@ public class BungeeConfigure extends Configure {
                     plugin.getLogger().warning(e.getMessage());
                 }
                 catch (Exception e){
-                    e.printStackTrace();
+                    //e.printStackTrace();
                 }
             }
 
             try {
                 this.config = ConfigurationProvider.getProvider(YamlConfiguration.class).load(file);
+                deserialize(config,object);
             }
             catch (Exception e){
                 this.config = new Configuration();
-                e.printStackTrace();
+                //e.printStackTrace();
             }
             filepath = ymlPath;
-            deserialize(config,object);
         }
     }
 
@@ -101,7 +101,7 @@ public class BungeeConfigure extends Configure {
                 autoCreateFile(file);
                 ConfigurationProvider.getProvider(YamlConfiguration.class).save(config,file);
             } catch (IOException e) {
-                e.printStackTrace();
+                //e.printStackTrace();
             }
         }
     }

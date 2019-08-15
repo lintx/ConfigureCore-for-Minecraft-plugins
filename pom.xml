@@ -6,7 +6,7 @@
 
     <groupId>org.lintx.plugins.modules</groupId>
     <artifactId>Configure</artifactId>
-    <version>1.2.2-SNAPSHOT</version>
+    <version>1.2.3-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>ConfigureCore</name>
     <description>ConfigureCore: Let your Minecraft plugin load and save the configuration. You no longer need to care about config.yml or any other .yml file. Support for BukkitAPI and BungeeCord.</description>

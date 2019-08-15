@@ -92,7 +92,7 @@ public class BukkitConfigure extends Configure {
             try {
                 config.save(file);
             } catch (IOException e) {
-                e.printStackTrace();
+                //e.printStackTrace();
             }
         }
     }

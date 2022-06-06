@@ -148,11 +148,8 @@ public class BukkitConfigure extends Configure {
                             for (Object o : list) {
 
                                 YamlConfiguration section = new YamlConfiguration();
-                                Method method = section.getClass().getDeclaredMethod("convertMapsToSections",Map.class,ConfigurationSection.class);
-
-                                if (method!=null){
-                                    method.setAccessible(true);
-                                    method.invoke(section, o,section);
+                                if (o instanceof Map){
+                                    this.convertMapsToSections((Map<?, ?>) o, section);
                                     Object obj = genericClz.newInstance();
                                     deserialize(section,obj);
                                     val.add(obj);
@@ -194,6 +191,18 @@ public class BukkitConfigure extends Configure {
             }
             catch (Exception e){
                 e.printStackTrace();
+            }
+        }
+    }
+
+    protected void convertMapsToSections(Map<?, ?> input, ConfigurationSection section) {
+        for (Map.Entry<?, ?> item : input.entrySet()) {
+            String key = item.getKey().toString();
+            Object value = item.getValue();
+            if (value instanceof Map) {
+                this.convertMapsToSections((Map<?, ?>) value, section.createSection(key));
+            } else {
+                section.set(key, value);
             }
         }
     }
